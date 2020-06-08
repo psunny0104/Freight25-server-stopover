@@ -4,7 +4,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const request = require('request-promise');
-const schedule = require('node-schedule');
 const cron = require('node-cron');
 // Firebase setup
 const firebaseAdmin = require('firebase-admin');
@@ -249,27 +248,45 @@ const updatePb = () => {
         for(var areaNum = 0; areaNum<17; areaNum++){
           console.log("cnt[dayNum][areaNum]  / total[dayNum] = "+cnt[dayNum][areaNum]+" / "+total[dayNum]);
           newValue[dayNum][areaNum] = Math.floor(100*(cnt[dayNum][areaNum]/total[dayNum]));
+          if(isNaN(newValue[dayNum][areaNum]))
+            newValue[dayNum][areaNum] = 0;
           console.log(dayNum+" "+areaNum+": "+newValue[dayNum][areaNum]+"\n");
         }
       }
       //db 갱신
       var batch = db.batch();
       for(var i = 0; i<7; i++){
-        var fbDay = days[i];
-        for(var j = 0; j<14; j++){
-          var fbArea = areasEng[j];
-          var ref = db.collection('probability').doc(fbDay);
-          batch.update(ref,{fbArea: newValue[i][j]})
-        }
+        var ref = db.collection('probability').doc(days[i]);
+        //console.log(i+" "+j);
+        //console.log(days[i]+": "+areasEng[j]+": "+newValue[i][j]);
+        batch.set(ref,{
+          [areasEng[0]] : newValue[i][0],
+          [areasEng[1]] : newValue[i][1],
+          [areasEng[2]] : newValue[i][2],
+          [areasEng[3]] : newValue[i][3],
+          [areasEng[4]] : newValue[i][4],
+          [areasEng[5]] : newValue[i][5],
+          [areasEng[6]] : newValue[i][6],
+          [areasEng[7]] : newValue[i][7],
+          [areasEng[8]] : newValue[i][8],
+          [areasEng[9]] : newValue[i][9],
+          [areasEng[10]] : newValue[i][10],
+          [areasEng[11]] : newValue[i][11],
+          [areasEng[12]] : newValue[i][12],
+          [areasEng[13]] : newValue[i][13],
+          [areasEng[14]] : newValue[i][14],
+          [areasEng[15]] : newValue[i][15],
+          [areasEng[16]] : newValue[i][16]
+        })
       }
       batch.commit();
   });
 };
 
 
-//cron.schedule('*/5 * * * * *', function(){
+//cron.schedule('*/10 * * * * *', function(){
 cron.schedule('0 0 * * * 1', function(){
-  // 월요일 0시 0분 갱신
+  //월요일 0시 0분 갱신
   console.log('Freight25 Update Start!');
   updatePb();
 });
