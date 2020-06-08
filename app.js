@@ -4,7 +4,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const request = require('request-promise');
-
+const schedule = require('node-schedule');
+const cron = require('node-cron');
 // Firebase setup
 const firebaseAdmin = require('firebase-admin');
 // you should manually put your service-account.json in the same folder app.js
@@ -195,6 +196,82 @@ app.get('/stopover', (req,res) => {
       res.status(400).send({error: error}).send({message: error.message});
     }
   }
+});
+
+//매주 월요일 정해진 시간에 서버에서 데이터 처리
+const updatePb = () => {
+  //준비
+  var areas = ['강원','경기','경남','경북','광주','대구','대전','부산','서울','세종특별자치시','울산','인천','전남','전북','제주특별자치도','충남','충북'];
+  var areasEng = ['gw','gg','gn','gb','gj','dg','dj','bs','se','sj','us','ic','jn','jb','jj','cn','cb'];
+  var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+  var cnt = new Array(7);
+  var newValue = new Array(7);
+  var total = new Array(7);
+  for(var i = 0; i<7; i++){
+    cnt[i] = new Array(17);
+    newValue[i] = new Array(17);
+    total[i] = 0;
+  }
+
+  for(var i = 0; i<7; i++){
+    for(var j = 0; j<17; j++){
+      newValue[i][j] = 0;
+      cnt[i][j] = 0;
+    }
+  }
+
+  var areaMap = new Map();
+  for(var i = 0; i<17; i++){
+    areaMap.set(areas[i],i);
+  }
+
+  var dateWeekAgo = new Date();
+  var dateNow = dateWeekAgo.getDate();
+  dateWeekAgo.setDate(dateNow - 7);
+
+  db.collection('freights').where("timeStampCreated",">=",dateWeekAgo)
+    .get()
+    .then(async function(querySnapshot){
+      //저장
+      for(var query in querySnapshot.docs){
+        const doc = querySnapshot.docs[query].data();
+        console.log(new Date(doc.timeStampCreated._seconds*1000));
+        var day = new Date(doc.timeStampCreated._seconds*1000).getDay();
+        var areaOrigin = doc.endAddr;
+        var area = areaOrigin.split(" ",1);
+        cnt[day][areaMap.get(area[0])] += 1;
+        total[day] += 1;
+      }
+      //계산
+      console.log(total[5]);
+      for(var dayNum = 0; dayNum<7; dayNum++){
+        for(var areaNum = 0; areaNum<17; areaNum++){
+          console.log("cnt[dayNum][areaNum]  / total[dayNum] = "+cnt[dayNum][areaNum]+" / "+total[dayNum]);
+          newValue[dayNum][areaNum] = Math.floor(100*(cnt[dayNum][areaNum]/total[dayNum]));
+          console.log(dayNum+" "+areaNum+": "+newValue[dayNum][areaNum]+"\n");
+        }
+      }
+      //db 갱신
+      var batch = db.batch();
+      for(var i = 0; i<7; i++){
+        var fbDay = days[i];
+        for(var j = 0; j<14; j++){
+          var fbArea = areasEng[j];
+          var ref = db.collection('probability').doc(fbDay);
+          batch.update(ref,{fbArea: newValue[i][j]})
+        }
+      }
+      batch.commit();
+  });
+};
+
+
+//cron.schedule('*/5 * * * * *', function(){
+cron.schedule('0 0 * * * 1', function(){
+  // 월요일 0시 0분 갱신
+  console.log('Freight25 Update Start!');
+  updatePb();
 });
 
 // Start the server
