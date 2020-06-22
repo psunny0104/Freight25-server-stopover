@@ -285,8 +285,9 @@ const updatePb = () => {
 
 
 //cron.schedule('*/10 * * * * *', function(){
-cron.schedule('0 0 * * * 1', function(){
+cron.schedule('0 15 ? * SUN *', function(){
   //월요일 0시 0분 갱신
+  //UTC 시간으로 변환
   console.log('Freight25 Update Start!');
   updatePb();
 });
